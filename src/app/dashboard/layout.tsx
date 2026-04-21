@@ -10,7 +10,7 @@ import {
     User,
     LogOut,
     Mail,
-    Loader2
+    Loader2, Building2
 } from 'lucide-react';
 
 // ==========================================
@@ -117,8 +117,7 @@ export default function DashboardLayout({
                 <nav className="flex-1 space-y-3">
                     <NavItem href="/dashboard" icon={Calendar} label="控制儀表板" currentPath={currentPath} exact />
                     <NavItem href="/dashboard/procurements" icon={FileText} label="採購行程管理" currentPath={currentPath} exact />
-                    <NavItem href="/dashboard/vendors" icon={Plus} label="廠商資料管理" currentPath={currentPath} exact />
-                    <NavItem href="/dashboard/settings" icon={Settings} label="系統參數設定" currentPath={currentPath} exact />
+                    <NavItem href="/dashboard/vendors" icon={Building2} label="廠商資料管理" currentPath={currentPath} exact />
                 </nav>
 
                 {/* 使用者狀態與登出 */}
