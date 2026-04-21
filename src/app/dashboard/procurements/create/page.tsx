@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
 import {
     Save,
@@ -51,6 +52,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function CreateProcurementPage() {
+    const router = useRouter();
     const [user, setUser] = useState<SupabaseUser | null>(null);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -60,7 +62,7 @@ export default function CreateProcurementPage() {
     const [exchangeRate, setExchangeRate] = useState<number | null>(null);
     const [fetchingRate, setFetchingRate] = useState<boolean>(false);
 
-    // 表單資料狀態 (新增 notify_to 與 notify_cc)
+    // 表單資料狀態
     const [formData, setFormData] = useState<ProcurementFormData>({
         title: '',
         budget: 0,
@@ -138,17 +140,18 @@ export default function CreateProcurementPage() {
             return;
         }
 
-        if (!formData.title || !formData.budget || !formData.end_date || !formData.notify_to) {
-            alert('「採購案名」、「預算」、「完成日期」與「通知承辦人」皆為必填項目！');
+        // 修改檢查邏輯：現在 start_date 為必填
+        if (!formData.title || !formData.budget || !formData.start_date || !formData.notify_to) {
+            alert('「採購案名」、「預算」、「起始日期」與「通知承辦人」皆為必填項目！');
             return;
         }
 
-        // 自動計算下次提醒日期 (end_date - reminder_days_before)
+        // 自動計算下次提醒日期 (改為：start_date - reminder_days_before)
         let nextReminderDate = null;
-        if (formData.end_date) {
-            const endDateObj = new Date(formData.end_date);
-            endDateObj.setDate(endDateObj.getDate() - (formData.reminder_days_before || 0));
-            nextReminderDate = endDateObj.toISOString().split('T')[0];
+        if (formData.start_date) {
+            const startDateObj = new Date(formData.start_date);
+            startDateObj.setDate(startDateObj.getDate() - (formData.reminder_days_before || 0));
+            nextReminderDate = startDateObj.toISOString().split('T')[0];
         }
 
         // 將填寫的 Email 轉換為陣列，並存入 JSONB
@@ -170,7 +173,7 @@ export default function CreateProcurementPage() {
                 cycle: formData.cycle,
                 reminder_days_before: formData.reminder_days_before,
                 description: formData.description,
-                email_template: emailTemplateConfig, // 將通知對象寫入此 JSONB 欄位
+                email_template: emailTemplateConfig,
                 creator_id: user.id,
                 is_active: true
             };
@@ -181,7 +184,7 @@ export default function CreateProcurementPage() {
 
             if (error) throw error;
 
-            window.location.href = '/dashboard/procurements';
+            router.push('/dashboard/procurements');
         } catch (err) {
             if (err instanceof Error) {
                 alert('儲存發生錯誤: ' + err.message);
@@ -191,7 +194,6 @@ export default function CreateProcurementPage() {
         }
     };
 
-    // 開啟原生日期選擇器的共用方法
     const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
         try {
             if (typeof e.currentTarget.showPicker === 'function') {
@@ -216,53 +218,36 @@ export default function CreateProcurementPage() {
     return (
         <div className="max-w-4xl mx-auto p-12">
             <header className="mb-10">
-                <nav className="flex items-center space-x-2 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">
+                <nav className="flex items-center space-x-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
                     <span>Enterprise</span>
                     <ChevronRight size={10} />
                     <span className="text-blue-500">Procurements</span>
                     <ChevronRight size={10} />
-                    <span className="text-slate-400">Create</span>
+                    <span className="text-slate-300">Create</span>
                 </nav>
             </header>
 
             <div className="bg-slate-900/60 border border-slate-800 rounded-[3.5rem] p-14 shadow-2xl relative overflow-hidden backdrop-blur-xl">
-                <div className="flex justify-between items-center mb-14 pb-10 border-b border-slate-800/60">
-                    <div>
-                        <h3 className="text-3xl font-black tracking-tight text-white flex items-center">
-                            <FileEdit className="mr-3 text-blue-500" size={32} />
-                            建立新採購計畫
-                        </h3>
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mt-2 ml-11">
-                            Create New Execution Plan
-                        </p>
-                    </div>
-                    <div className="flex space-x-4">
-                        <button
-                            onClick={() => window.location.href = '/dashboard/procurements'}
-                            className="px-8 py-3.5 text-slate-500 font-black uppercase tracking-widest text-xs hover:text-slate-300 transition-colors"
-                        >
-                            取消返回
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={loading}
-                            className="px-10 py-3.5 bg-blue-600 hover:bg-blue-500 rounded-2xl text-sm font-black text-white flex items-center shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 tracking-widest uppercase"
-                        >
-                            {loading ? <Loader2 className="animate-spin mr-3" size={20} /> : <Save size={20} className="mr-3" />}
-                            確認儲存行程
-                        </button>
-                    </div>
+                {/* 標題區塊，移除了右上角的按鈕 */}
+                <div className="mb-12 pb-8 border-b border-slate-800/60">
+                    <h3 className="text-3xl font-black tracking-tight text-white flex items-center">
+                        <FileEdit className="mr-3 text-blue-500" size={32} />
+                        建立新採購計畫
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-2 ml-11">
+                        Create New Execution Plan
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-12">
                     {/* 標題輸入 */}
                     <div className="col-span-2">
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
                             採購標題案名 <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all text-xl font-black placeholder:text-slate-800 text-white"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all text-xl font-black placeholder:text-slate-500 text-white"
                             placeholder="請輸入採購計畫名稱..."
                             value={formData.title}
                             onChange={(e) => setFormData({...formData, title: e.target.value})}
@@ -271,12 +256,12 @@ export default function CreateProcurementPage() {
 
                     {/* 時程設定區 */}
                     <div>
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
-                            預計開始日期
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
+                            預計開始日期 <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <CalendarDays size={20} className="text-slate-600" />
+                                <CalendarDays size={20} className="text-slate-400" />
                             </div>
                             <input
                                 type="date"
@@ -285,7 +270,7 @@ export default function CreateProcurementPage() {
                                 style={{ colorScheme: 'dark' }}
                                 onClick={handleDateClick}
                                 title="點擊選擇日期"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({...formData, start_date: e.target.value})}
                             />
@@ -293,12 +278,12 @@ export default function CreateProcurementPage() {
                     </div>
 
                     <div>
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
-                            預計完成日期 (結案日) <span className="text-red-500">*</span>
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
+                            預計完成日期 (結案日)
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <CalendarDays size={20} className="text-slate-600" />
+                                <CalendarDays size={20} className="text-slate-400" />
                             </div>
                             <input
                                 type="date"
@@ -307,7 +292,7 @@ export default function CreateProcurementPage() {
                                 style={{ colorScheme: 'dark' }}
                                 onClick={handleDateClick}
                                 title="點擊選擇日期"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.end_date}
                                 onChange={(e) => setFormData({...formData, end_date: e.target.value})}
                             />
@@ -317,7 +302,7 @@ export default function CreateProcurementPage() {
                     {/* 預算與幣別 */}
                     <div>
                         <div className="flex justify-between items-end mb-4 ml-3">
-                            <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                            <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em]">
                                 核定預算 <span className="text-red-500">*</span>
                             </label>
                             {fetchingRate && <Loader2 className="animate-spin text-blue-500" size={14} />}
@@ -329,10 +314,10 @@ export default function CreateProcurementPage() {
                         </div>
                         <div className="flex group relative">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                                <DollarSign size={18} className="text-slate-500" />
+                                <DollarSign size={18} className="text-slate-400" />
                             </div>
                             <select
-                                className="bg-slate-800 border-r-0 border-slate-800 rounded-l-2xl pl-10 pr-4 text-sm font-black focus:outline-none text-white cursor-pointer appearance-none"
+                                className="bg-slate-800 border-r-0 border-slate-700 rounded-l-2xl pl-10 pr-4 text-sm font-black focus:outline-none text-white cursor-pointer appearance-none"
                                 value={formData.currency}
                                 onChange={(e) => setFormData({...formData, currency: e.target.value})}
                             >
@@ -342,13 +327,13 @@ export default function CreateProcurementPage() {
                             <input
                                 type="number"
                                 min="0"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-r-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-lg text-white"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-r-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-lg text-white"
                                 value={formData.budget || ''}
                                 onChange={(e) => setFormData({...formData, budget: parseInt(e.target.value) || 0})}
                             />
                         </div>
                         {formData.currency === 'USD' && exchangeRate && formData.budget ? (
-                            <p className="text-xs text-slate-500 font-mono mt-3 ml-3">
+                            <p className="text-xs text-slate-400 font-mono mt-3 ml-3">
                                 約合台幣 NT$ {(formData.budget * exchangeRate).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
                             </p>
                         ) : null}
@@ -356,15 +341,15 @@ export default function CreateProcurementPage() {
 
                     {/* 廠商選擇 */}
                     <div>
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
                             關聯主要協力廠商
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <Building2 size={20} className="text-slate-600" />
+                                <Building2 size={20} className="text-slate-400" />
                             </div>
                             <select
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white appearance-none cursor-pointer"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white appearance-none cursor-pointer"
                                 value={formData.current_vendor_id}
                                 onChange={(e) => setFormData({...formData, current_vendor_id: e.target.value})}
                             >
@@ -380,16 +365,16 @@ export default function CreateProcurementPage() {
 
                     {/* 通知對象 - 承辦人 (To) */}
                     <div className="col-span-2">
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
                             通知承辦人 (To) <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <Users size={20} className="text-slate-600" />
+                                <Users size={20} className="text-slate-400" />
                             </div>
                             <input
                                 type="text"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-700"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-500"
                                 placeholder="輸入 Email 信箱，多筆請以半形逗號 ( , ) 隔開"
                                 value={formData.notify_to}
                                 onChange={(e) => setFormData({...formData, notify_to: e.target.value})}
@@ -399,16 +384,16 @@ export default function CreateProcurementPage() {
 
                     {/* 通知對象 - 主管副本 (Cc) */}
                     <div className="col-span-2">
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
                             通知主管 / 副本 (Cc)
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <MailPlus size={20} className="text-slate-600" />
+                                <MailPlus size={20} className="text-slate-400" />
                             </div>
                             <input
                                 type="text"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-700"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-500"
                                 placeholder="輸入主管 Email 信箱，多筆請以半形逗號 ( , ) 隔開"
                                 value={formData.notify_cc}
                                 onChange={(e) => setFormData({...formData, notify_cc: e.target.value})}
@@ -418,12 +403,12 @@ export default function CreateProcurementPage() {
 
                     {/* 描述備註 */}
                     <div className="col-span-2">
-                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                        <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4 ml-3">
                             備註與詳細說明
                         </label>
                         <textarea
                             rows={3}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-800 resize-none"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-6 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-500 resize-none"
                             placeholder="輸入有關此採購案的詳細資訊..."
                             value={formData.description}
                             onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -431,44 +416,45 @@ export default function CreateProcurementPage() {
                     </div>
 
                     {/* 提醒排程引擎 */}
-                    <div className="col-span-2 p-10 bg-blue-600/5 rounded-[3rem] border border-blue-500/10 mt-2 shadow-inner relative overflow-hidden">
+                    <div className="col-span-2 p-10 bg-blue-600/5 rounded-[3rem] border border-blue-500/20 mt-2 shadow-inner relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-                        <div className="flex items-center justify-between mb-8 border-l-4 border-blue-600 pl-5">
+                        <div className="flex items-center justify-between mb-8 border-l-4 border-blue-500 pl-5">
                             <div className="flex items-center">
-                                <Clock size={16} className="text-blue-500 mr-2" />
-                                <h4 className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] italic">
+                                <Clock size={16} className="text-blue-400 mr-2" />
+                                <h4 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.3em] italic">
                                     Automation & Reminder Engine
                                 </h4>
                             </div>
-                            {formData.end_date && (
-                                <div className="text-xs font-mono text-emerald-400">
+                            {/* 改用 start_date 來預覽下次提醒日 */}
+                            {formData.start_date && (
+                                <div className="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
                                     系統預計將於 {(
-                                    new Date(new Date(formData.end_date).getTime() - (formData.reminder_days_before * 86400000))
-                                ).toISOString().split('T')[0]} 發送通知給指定承辦人
+                                    new Date(new Date(formData.start_date).getTime() - (formData.reminder_days_before * 86400000))
+                                ).toISOString().split('T')[0]} 發送通知
                                 </div>
                             )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-10">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-2">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">
                                     前置提醒天數 (Days)
                                 </label>
                                 <input
                                     type="number"
                                     min="0"
-                                    className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-blue-600/30 transition-all font-black text-blue-400 text-lg"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-blue-600/30 transition-all font-black text-blue-400 text-lg"
                                     value={formData.reminder_days_before}
                                     onChange={(e) => setFormData({...formData, reminder_days_before: parseInt(e.target.value) || 0})}
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-2">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">
                                     排程週期
                                 </label>
                                 <select
-                                    className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-blue-600/30 transition-all font-black text-white appearance-none cursor-pointer"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-blue-600/30 transition-all font-black text-white appearance-none cursor-pointer"
                                     value={formData.cycle}
                                     onChange={(e) => setFormData({...formData, cycle: e.target.value})}
                                 >
@@ -479,6 +465,24 @@ export default function CreateProcurementPage() {
                                 </select>
                             </div>
                         </div>
+                    </div>
+
+                    {/* 按鈕移到底部 */}
+                    <div className="col-span-2 flex justify-end items-center space-x-6 mt-6 pt-10 border-t border-slate-800/60">
+                        <button
+                            onClick={() => router.push('/dashboard/procurements')}
+                            className="px-8 py-3.5 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-white transition-colors"
+                        >
+                            取消返回
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="px-10 py-3.5 bg-blue-600 hover:bg-blue-500 rounded-2xl text-sm font-black text-white flex items-center shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 tracking-widest uppercase"
+                        >
+                            {loading ? <Loader2 className="animate-spin mr-3" size={20} /> : <Save size={20} className="mr-3" />}
+                            確認儲存行程
+                        </button>
                     </div>
 
                 </div>
