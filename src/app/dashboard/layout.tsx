@@ -117,7 +117,7 @@ export default function DashboardLayout({
                 <nav className="flex-1 space-y-3">
                     <NavItem href="/dashboard" icon={Calendar} label="控制儀表板" currentPath={currentPath} exact />
                     <NavItem href="/dashboard/procurements" icon={FileText} label="採購行程管理" currentPath={currentPath} exact />
-                    <NavItem href="/dashboard/procurements/create" icon={Plus} label="新增採購計畫" currentPath={currentPath} exact />
+                    <NavItem href="/dashboard/vendors" icon={Plus} label="廠商資料管理" currentPath={currentPath} exact />
                     <NavItem href="/dashboard/settings" icon={Settings} label="系統參數設定" currentPath={currentPath} exact />
                 </nav>
 
