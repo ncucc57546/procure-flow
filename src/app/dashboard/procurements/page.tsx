@@ -10,7 +10,7 @@ import {
     Loader2,
     ChevronRight,
     Plus,
-    AlertCircle
+    AlertCircle, Edit2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -192,7 +192,7 @@ export default function ProcurementsListPage() {
                 <div className="p-10 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <div className="flex items-center">
                         <h3 className="font-black text-2xl flex items-center tracking-tight text-white">
-                            <FileText className="mr-4 text-blue-500" size={28} /> 全域採購清單
+                            <FileText className="mr-4 text-blue-500" size={28} /> 採購清單
                         </h3>
                         <span className="ml-4 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-mono">
               Total: {filteredProcurements.length}
@@ -258,11 +258,11 @@ export default function ProcurementsListPage() {
                                 <td className="px-12 py-8 text-right">
                                     <div className="flex items-center justify-end space-x-3">
                                         <button
-                                            onClick={() => handleSendEmail(item)}
-                                            className="p-3 hover:bg-slate-800 rounded-2xl text-slate-500 hover:text-blue-400 transition-all border border-transparent hover:border-slate-700"
-                                            title="手動觸發通知信"
+                                            onClick={() => router.push(`/dashboard/procurements/${item.id}/edit`)}
+                                            className="p-3 hover:bg-slate-800 rounded-2xl text-slate-500 hover:text-amber-400 transition-all border border-transparent hover:border-slate-700"
+                                            title="編輯計畫"
                                         >
-                                            <Mail size={18}/>
+                                            <Edit2 size={18}/>
                                         </button>
                                         <button
                                             onClick={() => handleDelete(item.id, item.creator_id)}
