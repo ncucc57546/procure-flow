@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
 import {
     Save,
@@ -10,7 +9,8 @@ import {
     Building2,
     DollarSign,
     FileEdit,
-    Clock
+    Clock,
+    CalendarDays
 } from 'lucide-react';
 
 // ==========================================
@@ -26,6 +26,8 @@ interface ProcurementFormData {
     budget: number;
     currency: string;
     current_vendor_id: string;
+    start_date: string;
+    end_date: string;
     cycle: string;
     reminder_days_before: number;
     description: string;
@@ -45,7 +47,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function CreateProcurementPage() {
-    const router = useRouter();
     const [user, setUser] = useState<SupabaseUser | null>(null);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -55,19 +56,21 @@ export default function CreateProcurementPage() {
     const [exchangeRate, setExchangeRate] = useState<number | null>(null);
     const [fetchingRate, setFetchingRate] = useState<boolean>(false);
 
-    // 表單資料狀態
+    // 表單資料狀態 (加入 start_date 與 end_date)
     const [formData, setFormData] = useState<ProcurementFormData>({
         title: '',
         budget: 0,
         currency: 'TWD',
         current_vendor_id: '',
+        start_date: '',
+        end_date: '',
         cycle: 'yearly',
         reminder_days_before: 30,
         description: ''
     });
 
     // ==========================================
-    // 3. 初始資料載入 (使用者與廠商清單)
+    // 3. 初始資料載入
     // ==========================================
     useEffect(() => {
         const initData = async () => {
@@ -75,7 +78,6 @@ export default function CreateProcurementPage() {
             if (session) {
                 setUser(session.user);
 
-                // 從資料庫獲取廠商列表供下拉選單使用
                 const { data: vendorData, error: vendorError } = await supabase
                     .from('vendors')
                     .select('id, name')
@@ -122,7 +124,7 @@ export default function CreateProcurementPage() {
     }, [formData.currency]);
 
     // ==========================================
-    // 5. 儲存至資料庫
+    // 5. 儲存至資料庫與計算提醒日
     // ==========================================
     const handleSave = async () => {
         if (!user) {
@@ -130,9 +132,19 @@ export default function CreateProcurementPage() {
             return;
         }
 
-        if (!formData.title || !formData.budget) {
-            alert('「採購標題案名」與「核定預算」為必填項目！');
+        if (!formData.title || !formData.budget || !formData.end_date) {
+            alert('「採購標題案名」、「核定預算」與「預計完成日期」為必填項目！');
             return;
+        }
+
+        // 自動計算下次提醒日期 (end_date - reminder_days_before)
+        let nextReminderDate = null;
+        if (formData.end_date) {
+            const endDateObj = new Date(formData.end_date);
+            // 減去前置提醒天數
+            endDateObj.setDate(endDateObj.getDate() - (formData.reminder_days_before || 0));
+            // 格式化為 YYYY-MM-DD
+            nextReminderDate = endDateObj.toISOString().split('T')[0];
         }
 
         setLoading(true);
@@ -141,10 +153,13 @@ export default function CreateProcurementPage() {
                 title: formData.title,
                 budget: formData.budget,
                 currency: formData.currency,
+                current_vendor_id: formData.current_vendor_id || null,
+                start_date: formData.start_date || null,
+                end_date: formData.end_date || null,
+                next_reminder_date: nextReminderDate, // 寫入計算好的提醒日
                 cycle: formData.cycle,
                 reminder_days_before: formData.reminder_days_before,
                 description: formData.description,
-                current_vendor_id: formData.current_vendor_id || null, // 允許空值
                 creator_id: user.id,
                 is_active: true
             };
@@ -155,8 +170,7 @@ export default function CreateProcurementPage() {
 
             if (error) throw error;
 
-            // 儲存成功後，導回清單頁
-            router.push('/dashboard/procurements');
+            window.location.href = '/dashboard/procurements';
         } catch (err) {
             if (err instanceof Error) {
                 alert('儲存發生錯誤: ' + err.message);
@@ -179,7 +193,6 @@ export default function CreateProcurementPage() {
 
     return (
         <div className="max-w-4xl mx-auto p-12">
-            {/* 頂部標題與導覽 */}
             <header className="mb-10">
                 <nav className="flex items-center space-x-2 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">
                     <span>Enterprise</span>
@@ -190,7 +203,6 @@ export default function CreateProcurementPage() {
                 </nav>
             </header>
 
-            {/* 表單主體 */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-[3.5rem] p-14 shadow-2xl relative overflow-hidden backdrop-blur-xl">
                 <div className="flex justify-between items-center mb-14 pb-10 border-b border-slate-800/60">
                     <div>
@@ -204,7 +216,7 @@ export default function CreateProcurementPage() {
                     </div>
                     <div className="flex space-x-4">
                         <button
-                            onClick={() => router.push('/dashboard/procurements')}
+                            onClick={() => window.location.href = '/dashboard/procurements'}
                             className="px-8 py-3.5 text-slate-500 font-black uppercase tracking-widest text-xs hover:text-slate-300 transition-colors"
                         >
                             取消返回
@@ -233,6 +245,41 @@ export default function CreateProcurementPage() {
                             value={formData.title}
                             onChange={(e) => setFormData({...formData, title: e.target.value})}
                         />
+                    </div>
+
+                    {/* 時程設定區 (新增) */}
+                    <div>
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                            預計開始日期
+                        </label>
+                        <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <CalendarDays size={20} className="text-slate-600" />
+                            </div>
+                            <input
+                                type="date"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-text"
+                                value={formData.start_date}
+                                onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                            預計完成日期 (結案日) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <CalendarDays size={20} className="text-slate-600" />
+                            </div>
+                            <input
+                                type="date"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-text"
+                                value={formData.end_date}
+                                onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                            />
+                        </div>
                     </div>
 
                     {/* 預算與幣別 */}
@@ -278,7 +325,7 @@ export default function CreateProcurementPage() {
                     {/* 廠商選擇 */}
                     <div>
                         <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
-                            關聯主要協力廠商
+                            關聯主要協力廠商 (通知對象)
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -317,11 +364,20 @@ export default function CreateProcurementPage() {
                     <div className="col-span-2 p-10 bg-blue-600/5 rounded-[3rem] border border-blue-500/10 mt-2 shadow-inner relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-                        <div className="flex items-center mb-8 border-l-4 border-blue-600 pl-5">
-                            <Clock size={16} className="text-blue-500 mr-2" />
-                            <h4 className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] italic">
-                                Automation & Reminder Engine
-                            </h4>
+                        <div className="flex items-center justify-between mb-8 border-l-4 border-blue-600 pl-5">
+                            <div className="flex items-center">
+                                <Clock size={16} className="text-blue-500 mr-2" />
+                                <h4 className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] italic">
+                                    Automation & Reminder Engine
+                                </h4>
+                            </div>
+                            {formData.end_date && (
+                                <div className="text-xs font-mono text-emerald-400">
+                                    系統預計將於 {(
+                                    new Date(new Date(formData.end_date).getTime() - (formData.reminder_days_before * 86400000))
+                                ).toISOString().split('T')[0]} 發送通知
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-10">
