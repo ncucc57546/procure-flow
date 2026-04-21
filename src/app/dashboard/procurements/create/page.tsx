@@ -10,7 +10,9 @@ import {
     DollarSign,
     FileEdit,
     Clock,
-    CalendarDays
+    CalendarDays,
+    Users,
+    MailPlus
 } from 'lucide-react';
 
 // ==========================================
@@ -31,6 +33,8 @@ interface ProcurementFormData {
     cycle: string;
     reminder_days_before: number;
     description: string;
+    notify_to: string; // 承辦人 Email
+    notify_cc: string; // 主管/副本 Email
 }
 
 interface ExchangeRateResponse {
@@ -56,7 +60,7 @@ export default function CreateProcurementPage() {
     const [exchangeRate, setExchangeRate] = useState<number | null>(null);
     const [fetchingRate, setFetchingRate] = useState<boolean>(false);
 
-    // 表單資料狀態 (加入 start_date 與 end_date)
+    // 表單資料狀態 (新增 notify_to 與 notify_cc)
     const [formData, setFormData] = useState<ProcurementFormData>({
         title: '',
         budget: 0,
@@ -66,7 +70,9 @@ export default function CreateProcurementPage() {
         end_date: '',
         cycle: 'yearly',
         reminder_days_before: 30,
-        description: ''
+        description: '',
+        notify_to: '',
+        notify_cc: ''
     });
 
     // ==========================================
@@ -132,8 +138,8 @@ export default function CreateProcurementPage() {
             return;
         }
 
-        if (!formData.title || !formData.budget || !formData.end_date) {
-            alert('「採購標題案名」、「核定預算」與「預計完成日期」為必填項目！');
+        if (!formData.title || !formData.budget || !formData.end_date || !formData.notify_to) {
+            alert('「採購案名」、「預算」、「完成日期」與「通知承辦人」皆為必填項目！');
             return;
         }
 
@@ -141,11 +147,15 @@ export default function CreateProcurementPage() {
         let nextReminderDate = null;
         if (formData.end_date) {
             const endDateObj = new Date(formData.end_date);
-            // 減去前置提醒天數
             endDateObj.setDate(endDateObj.getDate() - (formData.reminder_days_before || 0));
-            // 格式化為 YYYY-MM-DD
             nextReminderDate = endDateObj.toISOString().split('T')[0];
         }
+
+        // 將填寫的 Email 轉換為陣列，並存入 JSONB
+        const emailTemplateConfig = {
+            to: formData.notify_to.split(',').map(email => email.trim()).filter(Boolean),
+            cc: formData.notify_cc.split(',').map(email => email.trim()).filter(Boolean),
+        };
 
         setLoading(true);
         try {
@@ -156,10 +166,11 @@ export default function CreateProcurementPage() {
                 current_vendor_id: formData.current_vendor_id || null,
                 start_date: formData.start_date || null,
                 end_date: formData.end_date || null,
-                next_reminder_date: nextReminderDate, // 寫入計算好的提醒日
+                next_reminder_date: nextReminderDate,
                 cycle: formData.cycle,
                 reminder_days_before: formData.reminder_days_before,
                 description: formData.description,
+                email_template: emailTemplateConfig, // 將通知對象寫入此 JSONB 欄位
                 creator_id: user.id,
                 is_active: true
             };
@@ -247,7 +258,7 @@ export default function CreateProcurementPage() {
                         />
                     </div>
 
-                    {/* 時程設定區 (新增) */}
+                    {/* 時程設定區 */}
                     <div>
                         <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
                             預計開始日期
@@ -258,7 +269,8 @@ export default function CreateProcurementPage() {
                             </div>
                             <input
                                 type="date"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-text"
+                                title="點擊日曆圖示選擇日期"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({...formData, start_date: e.target.value})}
                             />
@@ -275,7 +287,8 @@ export default function CreateProcurementPage() {
                             </div>
                             <input
                                 type="date"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-text"
+                                title="點擊日曆圖示選擇日期"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.end_date}
                                 onChange={(e) => setFormData({...formData, end_date: e.target.value})}
                             />
@@ -325,7 +338,7 @@ export default function CreateProcurementPage() {
                     {/* 廠商選擇 */}
                     <div>
                         <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
-                            關聯主要協力廠商 (通知對象)
+                            關聯主要協力廠商
                         </label>
                         <div className="relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -343,6 +356,44 @@ export default function CreateProcurementPage() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    </div>
+
+                    {/* 通知對象 - 承辦人 (To) */}
+                    <div className="col-span-2">
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                            通知承辦人 (To) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Users size={20} className="text-slate-600" />
+                            </div>
+                            <input
+                                type="text"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-700"
+                                placeholder="輸入 Email 信箱，多筆請以半形逗號 ( , ) 隔開"
+                                value={formData.notify_to}
+                                onChange={(e) => setFormData({...formData, notify_to: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
+                    {/* 通知對象 - 主管副本 (Cc) */}
+                    <div className="col-span-2">
+                        <label className="block text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-3">
+                            通知主管 / 副本 (Cc)
+                        </label>
+                        <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <MailPlus size={20} className="text-slate-600" />
+                            </div>
+                            <input
+                                type="text"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-medium text-white placeholder:text-slate-700"
+                                placeholder="輸入主管 Email 信箱，多筆請以半形逗號 ( , ) 隔開"
+                                value={formData.notify_cc}
+                                onChange={(e) => setFormData({...formData, notify_cc: e.target.value})}
+                            />
                         </div>
                     </div>
 
@@ -375,7 +426,7 @@ export default function CreateProcurementPage() {
                                 <div className="text-xs font-mono text-emerald-400">
                                     系統預計將於 {(
                                     new Date(new Date(formData.end_date).getTime() - (formData.reminder_days_before * 86400000))
-                                ).toISOString().split('T')[0]} 發送通知
+                                ).toISOString().split('T')[0]} 發送通知給指定承辦人
                                 </div>
                             )}
                         </div>
