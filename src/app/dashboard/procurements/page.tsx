@@ -126,7 +126,10 @@ export default function ProcurementsListPage() {
         try {
             const { error } = await supabase.from('procurement_items').delete().eq('id', id);
             if (error) throw error;
-            // 成功後 Realtime subscription 會自動觸發 fetchProcurements 更新畫面
+
+            // 【修正重點】：刪除成功後，立刻手動更新前端狀態，不再單純依賴 Realtime 廣播
+            setProcurements(prev => prev.filter(item => item.id !== id));
+
         } catch (err) {
             if (err instanceof Error) alert('刪除失敗: ' + err.message);
         }
@@ -192,14 +195,14 @@ export default function ProcurementsListPage() {
                 <div className="p-10 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <div className="flex items-center">
                         <h3 className="font-black text-2xl flex items-center tracking-tight text-white">
-                            <FileText className="mr-4 text-blue-500" size={28} /> 採購清單
+                            <FileText className="mr-4 text-blue-500" size={28} /> 全域採購清單
                         </h3>
                         <span className="ml-4 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-mono">
               Total: {filteredProcurements.length}
             </span>
                     </div>
                     <button
-                        onClick={() => router.push('/dashboard/procurements/create')}
+                        onClick={() => window.location.href = '/dashboard/procurements/create'}
                         className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center text-white"
                     >
                         <Plus size={16} className="mr-2" />
