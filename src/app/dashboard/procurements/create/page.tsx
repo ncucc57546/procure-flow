@@ -191,6 +191,17 @@ export default function CreateProcurementPage() {
         }
     };
 
+    // 開啟原生日期選擇器的共用方法
+    const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
+        try {
+            if (typeof e.currentTarget.showPicker === 'function') {
+                e.currentTarget.showPicker();
+            }
+        } catch (err) {
+            // 忽略部分瀏覽器不支援 showPicker 的錯誤
+        }
+    };
+
     // ==========================================
     // 6. 畫面渲染
     // ==========================================
@@ -269,7 +280,11 @@ export default function CreateProcurementPage() {
                             </div>
                             <input
                                 type="date"
-                                title="點擊日曆圖示選擇日期"
+                                min="2000-01-01"
+                                max="9999-12-31"
+                                style={{ colorScheme: 'dark' }}
+                                onClick={handleDateClick}
+                                title="點擊選擇日期"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({...formData, start_date: e.target.value})}
@@ -287,7 +302,11 @@ export default function CreateProcurementPage() {
                             </div>
                             <input
                                 type="date"
-                                title="點擊日曆圖示選擇日期"
+                                min="2000-01-01"
+                                max="9999-12-31"
+                                style={{ colorScheme: 'dark' }}
+                                onClick={handleDateClick}
+                                title="點擊選擇日期"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 pl-14 outline-none focus:ring-2 focus:ring-blue-600/50 transition-all font-black text-white cursor-pointer"
                                 value={formData.end_date}
                                 onChange={(e) => setFormData({...formData, end_date: e.target.value})}
