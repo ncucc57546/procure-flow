@@ -12,6 +12,7 @@ import {
     Plus,
     AlertCircle
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // ==========================================
 // 1. 強型別定義 (根據您的 Schema)
@@ -46,6 +47,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function ProcurementsListPage() {
+    const router = useRouter();
     const [procurements, setProcurements] = useState<ProcurementItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [searchQuery, setSearchQuery] = useState<string>('');
@@ -197,7 +199,7 @@ export default function ProcurementsListPage() {
             </span>
                     </div>
                     <button
-                        onClick={() => window.location.href = '/dashboard/procurements/create'}
+                        onClick={() => router.push('/dashboard/procurements/create')}
                         className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center text-white"
                     >
                         <Plus size={16} className="mr-2" />

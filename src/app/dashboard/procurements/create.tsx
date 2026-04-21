@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
 import {
     Save,
@@ -44,6 +45,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function CreateProcurementPage() {
+    const router = useRouter();
     const [user, setUser] = useState<SupabaseUser | null>(null);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -154,7 +156,7 @@ export default function CreateProcurementPage() {
             if (error) throw error;
 
             // 儲存成功後，導回清單頁
-            window.location.href = '/dashboard/procurements';
+            router.push('/dashboard/procurements');
         } catch (err) {
             if (err instanceof Error) {
                 alert('儲存發生錯誤: ' + err.message);
@@ -202,7 +204,7 @@ export default function CreateProcurementPage() {
                     </div>
                     <div className="flex space-x-4">
                         <button
-                            onClick={() => window.location.href = '/dashboard/procurements'}
+                            onClick={() => router.push('/dashboard/procurements')}
                             className="px-8 py-3.5 text-slate-500 font-black uppercase tracking-widest text-xs hover:text-slate-300 transition-colors"
                         >
                             取消返回
