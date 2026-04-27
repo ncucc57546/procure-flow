@@ -33,6 +33,7 @@ interface ProcurementItem {
     current_vendor_id: string | null;
     vendors: Vendor | null;
     is_active: boolean;
+    is_completed: boolean; // [新增] 完成註記欄位
     creator_id: string;
     created_at: string;
 }
@@ -56,6 +57,7 @@ export default function DashboardOverview() {
             const { data, error } = await supabase
                 .from('procurement_items')
                 .select(`*, vendors(name)`)
+                // 我們希望依照提醒日期排序，越近的越前面
                 .order('next_reminder_date', { ascending: true, nullsFirst: false });
 
             if (error) throw error;
@@ -79,7 +81,7 @@ export default function DashboardOverview() {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'procurement_items' },
                 () => {
-                    // 重新抓取資料以確保取得最新關聯的廠商名稱
+                    // 重新抓取資料以確保取得最新狀態與關聯的廠商名稱
                     fetchProcurements();
                 }
             )
@@ -96,10 +98,10 @@ export default function DashboardOverview() {
     const todayStr = new Date().toISOString().split('T')[0];
     const currentYear = new Date().getFullYear().toString();
 
-    // 指標 A: 進行中計畫
-    const activeProcurements = procurements.filter(p => p.is_active);
+    // 指標 A: 進行中計畫 (所有未完成的項目)
+    const activeProcurements = procurements.filter(p => !p.is_completed);
 
-    // 指標 B: 待處理急件 (進行中，且已到達或超過系統提醒日)
+    // 指標 B: 待處理急件 (未完成，且已到達或超過系統提醒日)
     const urgentProcurements = activeProcurements.filter(p =>
         p.next_reminder_date && p.next_reminder_date <= todayStr
     );
@@ -108,13 +110,14 @@ export default function DashboardOverview() {
     const thisYearProcurements = procurements.filter(p =>
         p.start_date && p.start_date.startsWith(currentYear)
     );
-    const completedThisYear = thisYearProcurements.filter(p => !p.is_active);
+    // 達成定義改為 is_completed === true
+    const completedThisYear = thisYearProcurements.filter(p => p.is_completed); 
     const totalThisYearCount = thisYearProcurements.length;
     const achievementRate = totalThisYearCount === 0
         ? 0
         : Math.round((completedThisYear.length / totalThisYearCount) * 100);
 
-    // 畫面下方的近期清單 (取最接近提醒日的 4 筆「進行中」案件)
+    // 畫面下方的近期清單 (取最接近提醒日的 4 筆「未完成」案件)
     const recentProcurements = activeProcurements.slice(0, 4);
 
     // ==========================================
@@ -149,7 +152,7 @@ export default function DashboardOverview() {
             {/* 數據統計圖卡 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                 <StatCard
-                    title="進行中計畫"
+                    title="待推進計畫"
                     value={activeProcurements.length.toString()}
                     subText="Active Tasks"
                     icon={Clock}
@@ -165,7 +168,7 @@ export default function DashboardOverview() {
                 <StatCard
                     title={`${currentYear} 年度達成率`}
                     value={`${achievementRate}%`}
-                    subText={`${completedThisYear.length} / ${totalThisYearCount} 筆行程`}
+                    subText={`已完成 ${completedThisYear.length} / ${totalThisYearCount} 筆`}
                     icon={CheckCircle2}
                     color="emerald"
                 />
@@ -187,7 +190,7 @@ export default function DashboardOverview() {
 
                 {recentProcurements.length === 0 ? (
                     <div className="py-24 text-center">
-                        <p className="text-slate-600 font-bold italic">目前沒有進行中的採購紀錄</p>
+                        <p className="text-slate-600 font-bold italic">目前沒有尚未完成的採購紀錄</p>
                         <button
                             onClick={() => window.location.href = '/dashboard/procurements/create'}
                             className="mt-6 px-8 py-3 bg-slate-800 hover:bg-slate-700 rounded-2xl text-xs font-black uppercase transition-all text-white"
@@ -198,18 +201,18 @@ export default function DashboardOverview() {
                 ) : (
                     <div className="space-y-5">
                         {recentProcurements.map(item => {
-                            // 判定單筆是否為急件
+                            // 判定單筆是否為急件 (已超過或等於今日的未完成案件)
                             const isUrgent = item.next_reminder_date && item.next_reminder_date <= todayStr;
 
                             return (
-                                <div key={item.id} className="group flex items-center justify-between p-7 bg-slate-950/40 rounded-[2rem] border border-slate-800 hover:border-blue-500/40 transition-all cursor-pointer">
+                                <div key={item.id} onClick={() => window.location.href = `/dashboard/procurements/${item.id}/edit`} className="group flex items-center justify-between p-7 bg-slate-950/40 rounded-[2rem] border border-slate-800 hover:border-blue-500/40 transition-all cursor-pointer">
                                     <div className="flex items-center space-x-6">
-                                        <div className={`w-2.5 h-16 rounded-full ${isUrgent ? 'bg-amber-500 shadow-lg shadow-amber-500/20' : 'bg-blue-600 shadow-lg shadow-blue-600/20'}`}></div>
+                                        <div className={`w-2.5 h-16 rounded-full transition-all ${isUrgent ? 'bg-amber-500 shadow-lg shadow-amber-500/20' : 'bg-blue-600 shadow-lg shadow-blue-600/20'}`}></div>
                                         <div>
                                             <h4 className="font-black text-xl text-slate-100 group-hover:text-blue-400 transition-colors">{item.title}</h4>
                                             <p className="text-xs text-slate-500 mt-1 font-bold">
                                                 {item.vendors?.name || '未指定廠商或內部處理'} •
-                                                <span className="text-slate-400 ml-1">結案日: {item.end_date || '未設定'}</span>
+                                                <span className="text-slate-400 ml-1">排定結案: {item.end_date || '未設定'}</span>
                                             </p>
                                         </div>
                                     </div>
@@ -218,7 +221,7 @@ export default function DashboardOverview() {
                                             {isUrgent ? '已達提醒日' : '下次提醒日'}
                                         </p>
                                         <p className={`text-2xl font-mono font-black tracking-tighter ${isUrgent ? 'text-white' : 'text-blue-500'}`}>
-                                            {item.next_reminder_date || '未設定'}
+                                            {item.next_reminder_date || '未排程'}
                                         </p>
                                     </div>
                                 </div>
@@ -256,15 +259,15 @@ const StatCard = ({ title, value, subText, color, icon: Icon }: StatCardProps) =
                     <Icon size={30} />
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-[0.25em] opacity-30 tracking-tighter italic">
-          Live Data
-        </span>
+                    Live Data
+                </span>
             </div>
             <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em]">{title}</p>
             <div className="flex items-baseline mt-3">
                 <h3 className="text-6xl font-black tracking-tighter text-white group-hover:text-blue-500 transition-colors">{value}</h3>
                 <span className="text-xs font-bold text-slate-500 ml-4 uppercase tracking-widest bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-          {subText}
-        </span>
+                    {subText}
+                </span>
             </div>
         </div>
     );
